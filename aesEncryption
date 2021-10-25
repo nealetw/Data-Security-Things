@@ -1,0 +1,122 @@
+#Project 2, Data Security and Privacy
+#Author: Neale, Tim
+#This was for a project to use AES encryption and decryption from a file
+#I was allowed to use third party libraries, but didn't because it was a lot more interesting
+#Plus if i used a library, this would just be like 3 function calls
+
+
+import os
+import random
+
+def readFile(name): 
+    file = open(name)
+    r = file.read()
+    file.close()
+    return r
+
+def writeFile(name, text):
+    file = open(name, "w") 
+    file.write(text)
+    file.close()
+
+#a function to purely turn the plaintext into a usable array of blocks
+def createStringArr(str):
+    returnString = []
+    for c in str:
+        returnString.append(ord(c))
+    return returnString
+
+def bitToHex(str):
+    return hex(int(str, 2))
+
+# Keygen just makes a binary string of length then turns it to hex
+def keygen(length):
+    k = ""
+    for x in range(0, length):
+        k = k + str((random.randint(0,1)))
+    return bitToHex(k)
+
+def generateIV(length):
+    iv = keygen(length)
+    writeFile("iv.txt", iv)
+    return iv
+
+
+#Overall, this function takes a string of pt, and string of hex values iv and k
+#This will turn the pt into an array of blocks to match the length of iv, 
+#   then use CBC to encrypt, return, and write the ciphertext to a file of ../data/ciphertext.txt
+def encrypt(pt, iv, k):
+    intPt = createStringArr(pt) #returns array of char int values
+    intIv = int(iv, 16)
+    intKey = int(k, 16) #convert all to ints for bitwise XOR
+
+    encBlocks = []
+
+    encBlock = intIv
+    for block in intPt: #go through each int of pt
+        encBlocks.append(encBlock) #add iv to returned value
+        encBlock = (block ^ encBlock) #XOR
+    encBlocks.append(encBlock)
+        
+    encString = ""
+    #XOR all blocks with the key and put them into hex, into a string to write
+    for block in encBlocks:
+        block = block ^ intKey
+        encString = encString + hex(block)
+
+    writeFile("ciphertext.txt", encString)
+    return encString
+                
+def decrypt(ct, iv, k):
+    intCt = ct.split("0x") #break into chars of hex
+    intIv = int(iv, 16)
+    intCt[0] = hex(intIv)
+    intKey = int(k, 16)
+
+    for block in intCt: #put all ct values through key first
+        block = int(str(block), 16) ^ intKey
+
+    encBlocks = []
+    encBlock = int(intCt[len(intCt)-1],16) #first thing should be the last
+    for x in range(1, len(intCt)):
+        index = len(intCt) - x #reverse order
+        encBlocks.append(encBlock)
+
+        #XOR the block and the previous block
+        encBlock = (int(intCt[index],16) ^ int(intCt[index-1],16))
+    encBlocks.append(encBlock)
+
+    encString = ""
+
+    #The decrypted chars are in encBlocks backwards, with trailing chars, so put it into string then reverse
+    for block in encBlocks[1:len(encBlocks)-1]:
+        encString = encString + chr(block)
+    encString = encString[::-1]
+
+    writeFile("decrypted.txt", encString)
+    return encString   
+
+
+################################# Main function calls are here #######################################
+
+#This will need to be changed to the working directory of the files to encrypt
+os.chdir("data")
+
+keyLength = 256 #This can be changed to any number of bits for the key length
+k = keygen(keyLength)
+print("Creating key of length", keyLength, ":", k, "\n")
+writeFile("key.txt", k)
+
+key = readFile("key.txt")
+text = readFile("plaintext.txt")
+
+ivLength = 32 #This can be changed to any number of bits for the IV
+iv = generateIV(ivLength)
+print("Creating IV of length", ivLength, ":", iv,"\n")
+
+#Here is the call of encrypt(), returning the CipherText
+print("Encrypting \'", text, "\' to \'", encrypt(text, iv, key), "\'\n")
+
+ctext = readFile("ciphertext.txt")
+#here is the call of decrypt(), returning the decrypted text
+print("Decrypting ciphertext to \'", decrypt(ctext, iv, key), "\'\n")
